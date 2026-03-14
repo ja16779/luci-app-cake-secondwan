@@ -1,0 +1,13 @@
+{
+    "admin/network/cake_secondwan": {
+        "title": "CAKE Secondwan",
+        "order": 71,
+        "action": {
+            "type": "view",
+            "path": "cake_secondwan/statistics"
+        },
+        "depends": {
+            "acl": ["luci-app-cake-secondwan"]
+        }
+    }
+}

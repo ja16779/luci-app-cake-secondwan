@@ -1,0 +1,12 @@
+{
+    "luci-app-cake-secondwan": {
+        "description": "CAKE Secondwan Stats",
+        "read": {
+            "file": {
+                "/usr/sbin/tc": [ "exec" ],
+                "/sbin/tc": [ "exec" ]
+            }
+        },
+        "write": {}
+    }
+}

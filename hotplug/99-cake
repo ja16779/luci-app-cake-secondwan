@@ -1,0 +1,6 @@
+#!/bin/sh
+[ "$ACTION" = ifup ] || exit 0
+[ "$INTERFACE" = secondwan ] || exit 0
+
+logger -t cake "Reloading CAKE due to $ACTION of $INTERFACE ($DEVICE)"
+sleep 10 && sh /etc/script/cake-tune.sh
