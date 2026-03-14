@@ -30,7 +30,9 @@ Refreshes every 5 seconds. History accumulates in-memory (60 samples × 5 s = 5 
 ## File layout
 
 ```
-/www/luci-static/resources/view/cake_secondwan/statistics.js   ← LuCI view
+/etc/config/cake_secondwan                                     ← UCI configuration
+/www/luci-static/resources/view/cake_secondwan/statistics.js   ← LuCI statistics view
+/www/luci-static/resources/view/cake_secondwan/settings.js     ← LuCI settings view
 /usr/share/luci/menu.d/luci-app-cake-secondwan.json            ← menu entry
 /usr/share/rpcd/acl.d/luci-app-cake-secondwan.json             ← rpcd ACL
 /etc/init.d/cake                                               ← init script
@@ -43,9 +45,13 @@ Refreshes every 5 seconds. History accumulates in-memory (60 samples × 5 s = 5 
 ### 1. Copy files
 
 ```sh
-# LuCI view
+# UCI config
+cp config/cake_secondwan /etc/config/cake_secondwan
+
+# LuCI views
 mkdir -p /www/luci-static/resources/view/cake_secondwan
 cp luci/statistics.js /www/luci-static/resources/view/cake_secondwan/statistics.js
+cp luci/settings.js   /www/luci-static/resources/view/cake_secondwan/settings.js
 
 # Menu entry
 cp luci/menu.json /usr/share/luci/menu.d/luci-app-cake-secondwan.json
@@ -67,24 +73,27 @@ cp script/cake-tune.sh /etc/script/cake-tune.sh
 chmod +x /etc/script/cake-tune.sh
 ```
 
-### 2. Adjust cake-tune.sh
+### 2. Configure via LuCI or UCI
 
-Edit `/etc/script/cake-tune.sh` to match your link:
+**Option A — LuCI:** Navigate to **Network → CAKE Secondwan → Settings** and fill in your values, then click *Save & Apply*.
+
+**Option B — UCI directly:**
 
 ```sh
-UPLINK="190Mbit"    # upload bandwidth
-DOWNLINK="190Mbit"  # download bandwidth
-RTT="20ms"          # estimated RTT to your ISP
-OVERHEAD="18"       # 18 = direct Ethernet, 22 = PPPoE, 44 = PPPoE+VLAN
-WAN="lan1"          # kernel interface name (secondwan)
-IFB="ifb-lan1"      # IFB device for ingress shaping
+uci set cake_secondwan.global.wan_iface='lan1'    # kernel interface name
+uci set cake_secondwan.global.ifb_iface='ifb-lan1'
+uci set cake_secondwan.global.uplink='190Mbit'
+uci set cake_secondwan.global.downlink='190Mbit'
+uci set cake_secondwan.global.rtt='20ms'          # RTT to ISP
+uci set cake_secondwan.global.overhead='18'       # 18=Ethernet, 22=PPPoE, 44=PPPoE+VLAN
+uci commit cake_secondwan
+sh /etc/script/cake-tune.sh
 ```
 
-### 3. Restart rpcd and apply CAKE
+### 3. Restart rpcd
 
 ```sh
 /etc/init.d/rpcd restart
-sh /etc/script/cake-tune.sh
 ```
 
 ### 4. Open LuCI
@@ -111,6 +120,7 @@ Navigate to **Network → CAKE Secondwan**.
 Add to `/etc/sysupgrade.conf`:
 
 ```
+/etc/config/cake_secondwan
 /etc/init.d/cake
 /etc/hotplug.d/iface/99-cake
 /www/luci-static/resources/view/cake_secondwan/

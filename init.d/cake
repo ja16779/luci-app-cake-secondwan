@@ -7,102 +7,39 @@ STOP=99
 
 service_triggers() {
     procd_add_reload_trigger "network"
+    procd_add_reload_trigger "cake_secondwan"
 }
 
 start_service() {
     /etc/init.d/cake enabled || exit 0
-    logger -t cake "Starting CAKE for secondwan (lan1)"
+    logger -t cake "Starting CAKE for secondwan"
     sh /etc/script/cake-tune.sh
 }
 
 stop_service() {
     echo stop
-    ############################################################
 
     ### Interface ###
-    WAN="lan1"
+    WAN=$(uci -q get cake_secondwan.global.wan_iface || echo "lan1")
+    IFB=$(uci -q get cake_secondwan.global.ifb_iface || echo "ifb-lan1")
 
-    ############################################################
-
-    ## Delete the old qdiscs created by the script
-    tc qdisc del dev veth0 root > /dev/null 2>&1
     tc qdisc del dev $WAN root > /dev/null 2>&1
-    tc qdisc del dev ifb-$WAN root > /dev/null 2>&1
+    tc qdisc del dev $IFB root > /dev/null 2>&1
     tc qdisc del dev $WAN ingress > /dev/null 2>&1
+    ip link del $IFB 2>/dev/null
 
-    ## Delete IFB
-    ip link del ifb-$WAN 2>/dev/null
-
-    ############################################################
-
-    ## Delete veth devices
-    ip link show veth0 > /dev/null 2>&1 && {
-    ip link set veth1 nomaster
-    ip link set veth1 promisc off
-    ip link set veth1 down
-    ip link set veth0 down
-    ip link del veth0
-    ip rule del priority 100 > /dev/null 2>&1
-    ip -6 rule del priority 100 > /dev/null 2>&1
-    }
-
-    ############################################################
-
-    ## Restore default OpenWrt settings
     sysctl -w net.core.default_qdisc=fq_codel > /dev/null 2>&1
     sysctl -w net.ipv4.tcp_congestion_control=cubic > /dev/null 2>&1
     sysctl -w net.ipv4.tcp_ecn=2 > /dev/null 2>&1
 
-    ############################################################
-
-    ## Flush all rules from the chains
-    nft flush chain inet fw4 dscp_marking_ports_ipv4 > /dev/null 2>&1
-    nft flush chain inet fw4 dscp_marking_ports_ipv6 > /dev/null 2>&1
-    nft flush chain inet fw4 dscp_marking_ip_addresses_ipv4 > /dev/null 2>&1
-    nft flush chain inet fw4 dscp_marking_ip_addresses_ipv6 > /dev/null 2>&1
-
-    ## Delete the rule from the chains
-    nft delete rule inet fw4 pre_mangle_forward handle "$(nft -a list ruleset | grep "Wash all ISP DSCP marks to CS1 (IPv4)" | sed 's/.* //')" > /dev/null 2>&1
-    nft delete rule inet fw4 pre_mangle_forward handle "$(nft -a list ruleset | grep "Wash all ISP DSCP marks to CS1 (IPv6)" | sed 's/.* //')" > /dev/null 2>&1
-    nft delete rule inet fw4 pre_mangle_forward handle "$(nft -a list ruleset | grep "DSCP marking rules for ports (IPv4)" | sed 's/.* //')" > /dev/null 2>&1
-    nft delete rule inet fw4 pre_mangle_forward handle "$(nft -a list ruleset | grep "DSCP marking rules for ports (IPv6)" | sed 's/.* //')" > /dev/null 2>&1
-    nft delete rule inet fw4 pre_mangle_forward handle "$(nft -a list ruleset | grep "DSCP marking rules for IP addresses (IPv4)" | sed 's/.* //')" > /dev/null 2>&1
-    nft delete rule inet fw4 pre_mangle_forward handle "$(nft -a list ruleset | grep "DSCP marking rules for IP addresses (IPv6)" | sed 's/.* //')" > /dev/null 2>&1
-    nft delete rule inet fw4 pre_mangle_postrouting handle "$(nft -a list ruleset | grep "DSCP marking rules for ports (IPv4)" | sed 's/.* //')" > /dev/null 2>&1
-    nft delete rule inet fw4 pre_mangle_postrouting handle "$(nft -a list ruleset | grep "DSCP marking rules for ports (IPv6)" | sed 's/.* //')" > /dev/null 2>&1
-    nft delete rule inet fw4 pre_mangle_postrouting handle "$(nft -a list ruleset | grep "DSCP marking rules for IP addresses (IPv4)" | sed 's/.* //')" > /dev/null 2>&1
-    nft delete rule inet fw4 pre_mangle_postrouting handle "$(nft -a list ruleset | grep "DSCP marking rules for IP addresses (IPv6)" | sed 's/.* //')" > /dev/null 2>&1
-
-    ## Delete the chains
-    nft delete chain inet fw4 pre_mangle_forward > /dev/null 2>&1
-    nft delete chain inet fw4 pre_mangle_postrouting > /dev/null 2>&1
-    nft delete chain inet fw4 dscp_marking_ports_ipv4 > /dev/null 2>&1
-    nft delete chain inet fw4 dscp_marking_ports_ipv6 > /dev/null 2>&1
-    nft delete chain inet fw4 dscp_marking_ip_addresses_ipv4 > /dev/null 2>&1
-    nft delete chain inet fw4 dscp_marking_ip_addresses_ipv6 > /dev/null 2>&1
-
-    ############################################################
-    
-    ## Delete nftables files if they exist
-
-    # Check if the file in /tmp exists and delete it
-    if [ -f /tmp/00-rules.nft ]; then
-        rm /tmp/00-rules.nft
-    fi
-
-    # Check if the file in /etc/nftables.d exists and delete it
-    if [ -f /etc/nftables.d/00-rules.nft ]; then
-        rm /etc/nftables.d/00-rules.nft
-    fi
-    
     exit 0
 }
 
 restart() {
     echo "Restarting service..."
     /etc/init.d/cake stop
-    sleep 1 # Ensure all processes have been properly terminated
-    /etc/init.d/cake start    
+    sleep 1
+    /etc/init.d/cake start
 }
 
 reload_service() {

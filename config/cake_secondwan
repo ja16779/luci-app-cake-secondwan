@@ -1,0 +1,7 @@
+config global 'global'
+	option wan_iface 'lan1'
+	option ifb_iface 'ifb-lan1'
+	option uplink '190Mbit'
+	option downlink '190Mbit'
+	option rtt '20ms'
+	option overhead '18'

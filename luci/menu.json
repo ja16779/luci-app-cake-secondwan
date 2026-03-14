@@ -2,9 +2,27 @@
     "admin/network/cake_secondwan": {
         "title": "CAKE Secondwan",
         "order": 71,
+        "depends": {
+            "acl": ["luci-app-cake-secondwan"]
+        }
+    },
+    "admin/network/cake_secondwan/statistics": {
+        "title": "Statistics",
+        "order": 10,
         "action": {
             "type": "view",
             "path": "cake_secondwan/statistics"
+        },
+        "depends": {
+            "acl": ["luci-app-cake-secondwan"]
+        }
+    },
+    "admin/network/cake_secondwan/settings": {
+        "title": "Settings",
+        "order": 20,
+        "action": {
+            "type": "view",
+            "path": "cake_secondwan/settings"
         },
         "depends": {
             "acl": ["luci-app-cake-secondwan"]

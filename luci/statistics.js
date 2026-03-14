@@ -3,6 +3,7 @@
 'require poll';
 'require fs';
 'require dom';
+'require uci';
 
 // --- Historial en memoria (60 muestras x 5s = 5 minutos) ---
 var HISTORY_LEN = 60;
@@ -27,14 +28,14 @@ var formatBytes = function(b) {
 };
 
 // --- Obtener datos tc ---
-var getCakeData = function() {
+var getCakeData = function(wan, ifb) {
     return Promise.all([
-        fs.exec('tc', ['-s', '-j', 'qdisc', 'show', 'dev', 'lan1']),
-        fs.exec('tc', ['-s', '-j', 'qdisc', 'show', 'dev', 'ifb-lan1'])
+        fs.exec('tc', ['-s', '-j', 'qdisc', 'show', 'dev', wan]),
+        fs.exec('tc', ['-s', '-j', 'qdisc', 'show', 'dev', ifb])
     ]).then(function(res) {
-        var wan     = (JSON.parse(res[0].stdout || '[]') || []).filter(function(q){return q.kind==='cake';})[0] || null;
-        var ingress = (JSON.parse(res[1].stdout || '[]') || []).filter(function(q){return q.kind==='cake';})[0] || null;
-        return { wan: wan, ingress: ingress };
+        var wanQ    = (JSON.parse(res[0].stdout || '[]') || []).filter(function(q){return q.kind==='cake';})[0] || null;
+        var ingressQ= (JSON.parse(res[1].stdout || '[]') || []).filter(function(q){return q.kind==='cake';})[0] || null;
+        return { wan: wanQ, ingress: ingressQ };
     });
 };
 
@@ -49,7 +50,7 @@ var pushHistory = function(hist, cake) {
             countTins++;
         }
     });
-    var avgDelay = countTins > 0 ? (totalDelay / countTins / 1000) : 0; // ms
+    var avgDelay = countTins > 0 ? (totalDelay / countTins / 1000) : 0;
     hist.delay.push(avgDelay);
     if (hist.delay.length > HISTORY_LEN) hist.delay.shift();
 
@@ -74,7 +75,6 @@ var drawLineChart = function(canvas, data, labelY, color) {
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, W, H);
 
-    // Grid
     ctx.strokeStyle = '#2a2a45';
     ctx.lineWidth = 1;
     for (var g = 0; g <= 4; g++) {
@@ -93,7 +93,6 @@ var drawLineChart = function(canvas, data, labelY, color) {
     var vmax = Math.max.apply(null, data) || 1;
     vmax = vmax * 1.15;
 
-    // Y axis labels
     ctx.fillStyle = '#888';
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'right';
@@ -103,7 +102,6 @@ var drawLineChart = function(canvas, data, labelY, color) {
         ctx.fillText(val.toFixed(1), padL - 3, yy + 3);
     }
 
-    // Y label
     ctx.save();
     ctx.translate(10, padT + h/2);
     ctx.rotate(-Math.PI/2);
@@ -113,7 +111,6 @@ var drawLineChart = function(canvas, data, labelY, color) {
     ctx.fillText(labelY, 0, 0);
     ctx.restore();
 
-    // X labels
     ctx.fillStyle = '#555';
     ctx.font = '9px sans-serif';
     ctx.textAlign = 'center';
@@ -121,7 +118,6 @@ var drawLineChart = function(canvas, data, labelY, color) {
         ctx.fillText(lbl, padL + (w/5)*i, H - 5);
     });
 
-    // Area gradient fill
     ctx.beginPath();
     data.forEach(function(v, i) {
         var x = padL + (i / (HISTORY_LEN - 1)) * w;
@@ -137,7 +133,6 @@ var drawLineChart = function(canvas, data, labelY, color) {
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // Line
     ctx.beginPath();
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
@@ -148,7 +143,6 @@ var drawLineChart = function(canvas, data, labelY, color) {
     });
     ctx.stroke();
 
-    // Last value badge
     var last = data[data.length - 1];
     ctx.fillStyle = color;
     ctx.font = 'bold 11px sans-serif';
@@ -156,7 +150,7 @@ var drawLineChart = function(canvas, data, labelY, color) {
     ctx.fillText(last.toFixed(2) + ' ' + labelY, padL + w - 2, padT + 11);
 };
 
-// --- Bar chart DOM (estilo qosmate) ---
+// --- Bar chart DOM ---
 var createBarChart = function(title, labels, values, color) {
     var max = Math.max.apply(null, values) || 1;
     var bars = values.map(function(v, i) {
@@ -181,7 +175,7 @@ var renderSummaryTable = function(cake) {
     var opts = cake.options || {};
     var rows = [
         ['Bandwidth',  (opts.bandwidth||0)/1000 + ' Kbit/s'],
-        ['Enviado',    formatBytes(cake.bytes||0) + '  \u00b7  ' + (cake.packets||0) + ' pkts'],
+        ['Enviado',    formatBytes(cake.bytes||0) + '  ·  ' + (cake.packets||0) + ' pkts'],
         ['Drops',      String(cake.drops||0)],
         ['Overlimits', String(cake.overlimits||0)],
         ['Memoria',    formatBytes(cake.memory_used||0) + ' / ' + formatBytes(cake.memory_limit||4194304)],
@@ -243,7 +237,6 @@ var renderSection = function(cake, title, histKey, idDelay, idTp) {
         E('h3', {style:'border-bottom:2px solid #3344aa;padding-bottom:.4em;color:#88aaff;margin-bottom:12px'}, title),
         cake ? renderSummaryTable(cake) : E('p', {style:'color:#f88'}, 'Sin datos'),
 
-        // Line charts historicos
         E('div', {style:'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px'}, [
             E('div', {style:'background:#1a1a2e;border-radius:6px;padding:10px'}, [
                 E('div', {style:'font-size:11px;font-weight:bold;color:#66aaff;margin-bottom:6px'}, 'Avg Delay promedio (ms)'),
@@ -255,7 +248,6 @@ var renderSection = function(cake, title, histKey, idDelay, idTp) {
             ])
         ]),
 
-        // Bar charts por tin
         tins.length ? E('div', {style:'display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px'}, [
             createBarChart('Avg Delay (ms)', tinLabels, avgDelays, 'rgb(80,160,255)'),
             createBarChart('Peak Delay (ms)', tinLabels, pkDelays, 'rgb(255,150,50)'),
@@ -264,7 +256,6 @@ var renderSection = function(cake, title, histKey, idDelay, idTp) {
             createBarChart('Paquetes', tinLabels, pkts, 'rgb(80,210,130)'),
         ]) : E(''),
 
-        // Tabla detalle tins
         tins.length ? E('div', {}, [
             E('div', {style:'font-size:11px;font-weight:bold;color:#888;margin-bottom:6px'}, 'Detalle por Tin'),
             renderTinTable(tins)
@@ -272,7 +263,6 @@ var renderSection = function(cake, title, histKey, idDelay, idTp) {
     ]);
 };
 
-// --- Actualizar canvas (llamado 60ms despues del render DOM) ---
 var updateCanvases = function() {
     var pairs = [
         ['egress',  'cv-eg-delay', 'cv-eg-tp',  'rgb(80,160,255)',  'rgb(80,210,130)'],
@@ -288,27 +278,36 @@ var updateCanvases = function() {
 };
 
 return view.extend({
+    load: function() {
+        return uci.load('cake_secondwan');
+    },
+
     render: function() {
+        var wanIface = uci.get('cake_secondwan', 'global', 'wan_iface') || 'lan1';
+        var ifbIface = uci.get('cake_secondwan', 'global', 'ifb_iface') || 'ifb-lan1';
+        var uplink   = uci.get('cake_secondwan', 'global', 'uplink')    || '?';
+
         var container = E('div', {style:'background:#0d0d1a;padding:14px;min-height:300px'}, [
-            E('h2', {style:'color:#88aaff;margin-bottom:2px'}, 'CAKE \u2014 Secondwan (Megacable 190 Mbit)'),
+            E('h2', {style:'color:#88aaff;margin-bottom:2px'},
+                'CAKE — Secondwan (' + wanIface + ' / ' + uplink + ')'),
             E('p',  {style:'color:#555;font-size:.82em;margin-bottom:16px'},
-                'Actualizaci\u00f3n cada 5 s \u00b7 Historial: 5 min (60 muestras)'),
+                'Actualización cada 5 s · Historial: 5 min (60 muestras)'),
             E('div', {id:'cake-sw-egress'},  E('p', {style:'color:#666'}, 'Cargando egress...')),
             E('hr',  {style:'border-color:#2a2a44;margin:16px 0'}),
             E('div', {id:'cake-sw-ingress'}, E('p', {style:'color:#666'}, 'Cargando ingress...'))
         ]);
 
         poll.add(function() {
-            return getCakeData().then(function(data) {
+            return getCakeData(wanIface, ifbIface).then(function(data) {
                 pushHistory(history.egress,  data.wan);
                 pushHistory(history.ingress, data.ingress);
 
                 var elE = document.getElementById('cake-sw-egress');
                 var elI = document.getElementById('cake-sw-ingress');
                 if (elE) dom.content(elE, renderSection(
-                    data.wan,     'Egress (Upload) \u2014 lan1',        'egress',  'cv-eg-delay', 'cv-eg-tp'));
+                    data.wan,     'Egress (Upload) — ' + wanIface, 'egress',  'cv-eg-delay', 'cv-eg-tp'));
                 if (elI) dom.content(elI, renderSection(
-                    data.ingress, 'Ingress (Download) \u2014 ifb-lan1', 'ingress', 'cv-in-delay', 'cv-in-tp'));
+                    data.ingress, 'Ingress (Download) — ' + ifbIface, 'ingress', 'cv-in-delay', 'cv-in-tp'));
 
                 setTimeout(updateCanvases, 60);
             }).catch(function(err) {
