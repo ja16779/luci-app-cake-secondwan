@@ -15,7 +15,7 @@ Luego configura tu interfaz en **Network → CAKE Secondwan → Settings**.
 
 ## Screenshot
 
-> Network → CAKE Secondwan
+![CAKE Secondwan Dashboard](docs/dashboard.png)
 
 The dashboard shows — for both **Egress (lan1)** and **Ingress (ifb-lan1)**:
 
