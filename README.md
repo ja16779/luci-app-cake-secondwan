@@ -4,6 +4,15 @@ LuCI dashboard for CAKE QoS on a second WAN interface (secondwan) for OpenWrt 25
 
 Displays real-time statistics with live charts and per-tin breakdown, similar to qosmate's statistics view.
 
+## Instalación rápida
+
+```sh
+wget -qO /tmp/install.sh https://raw.githubusercontent.com/ja16779/luci-app-cake-secondwan/master/install.sh
+sh /tmp/install.sh
+```
+
+Luego configura tu interfaz en **Network → CAKE Secondwan → Settings**.
+
 ## Screenshot
 
 > Network → CAKE Secondwan
@@ -42,7 +51,16 @@ Refreshes every 5 seconds. History accumulates in-memory (60 samples × 5 s = 5 
 
 ## Installation
 
-### 1. Copy files
+### 1. Instalación automática (recomendado)
+
+```sh
+wget -qO /tmp/install.sh https://raw.githubusercontent.com/ja16779/luci-app-cake-secondwan/master/install.sh
+sh /tmp/install.sh
+```
+
+El script descarga todos los archivos, activa el servicio, actualiza `sysupgrade.conf` y aplica CAKE.
+
+### 2. Instalación manual
 
 ```sh
 # UCI config
