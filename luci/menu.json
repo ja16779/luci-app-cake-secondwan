@@ -2,6 +2,9 @@
     "admin/network/cake_secondwan": {
         "title": "CAKE Secondwan",
         "order": 71,
+        "action": {
+            "type": "firstchild"
+        },
         "depends": {
             "acl": ["luci-app-cake-secondwan"]
         }
